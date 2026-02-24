@@ -143,23 +143,13 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"indiamart_integration.tasks.all"
-# 	],
-# 	"daily": [
-# 		"indiamart_integration.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"indiamart_integration.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"indiamart_integration.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"indiamart_integration.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"indiamart_integration.indiamart_integration.doc_events.cron_job.scheduled_sync_indiamart_leads"
+		]
+	}
+}
 
 # Testing
 # -------
@@ -249,4 +239,3 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

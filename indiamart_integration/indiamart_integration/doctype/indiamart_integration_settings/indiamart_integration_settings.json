@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-24 12:23:01.978305",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "indiamart_integration_section",
+  "testing",
+  "api_key",
+  "column_break_eiro",
+  "api_secret",
+  "api_end_point",
+  "sync_time",
+  "api_logs_tab",
+  "logs"
+ ],
+ "fields": [
+  {
+   "fieldname": "indiamart_integration_section",
+   "fieldtype": "Section Break",
+   "label": "Indiamart Integration"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "Api Key"
+  },
+  {
+   "fieldname": "column_break_eiro",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "api_secret",
+   "fieldtype": "Password",
+   "label": "Api Secret"
+  },
+  {
+   "fieldname": "sync_time",
+   "fieldtype": "Int",
+   "label": "Sync Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "api_logs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Api Logs"
+  },
+  {
+   "fieldname": "logs",
+   "fieldtype": "Table",
+   "label": "Logs",
+   "options": "Indiamart API Log"
+  },
+  {
+   "fieldname": "api_end_point",
+   "fieldtype": "Data",
+   "label": "Api End Point",
+   "options": "URL"
+  },
+  {
+   "default": "0",
+   "fieldname": "testing",
+   "fieldtype": "Check",
+   "label": "Testing"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-24 14:51:13.880860",
+ "modified_by": "Administrator",
+ "module": "Indiamart Integration",
+ "name": "Indiamart Integration Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
