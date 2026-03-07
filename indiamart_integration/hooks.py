@@ -143,12 +143,16 @@ app_license = "mit"
 # Scheduled Tasks
 # ---------------
 
+fixtures = [
+    {"dt": "Custom Field", "filters": [["module", "=", "Indiamart Integration"]]}
+]
+
 scheduler_events = {
-	"cron": {
-		"*/5 * * * *": [
-			"indiamart_integration.indiamart_integration.doc_events.cron_job.scheduled_sync_indiamart_leads"
-		]
-	}
+    "cron": {
+        "*/5 * * * *": [
+            "indiamart_integration.indiamart_integration.doc_events.cron_job.scheduled_sync_indiamart_leads"
+        ]
+    }
 }
 
 # Testing

@@ -47,6 +47,7 @@
    "label": "Api Logs"
   },
   {
+   "allow_bulk_edit": 1,
    "fieldname": "logs",
    "fieldtype": "Table",
    "label": "Logs",
@@ -69,7 +70,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-24 14:51:13.880860",
+ "modified": "2026-03-07 12:22:13.036389",
  "modified_by": "Administrator",
  "module": "Indiamart Integration",
  "name": "Indiamart Integration Settings",
