@@ -507,13 +507,20 @@ class IndiamartIntegrationSettings(Document):
 
         endpoint = self._get_endpoint()
         api_key = self._get_api_key()
-        start_dt, end_dt = self._get_time_window(start_time, end_time)
+        day_wise = cint(self.get("day_wise"))
+        start_dt, end_dt = self._get_time_window(
+            start_time, end_time, day_wise=day_wise
+        )
 
-        params = {
-            "glusr_crm_key": api_key,
-            "start_time": self._format_indiamart_datetime(start_dt),
-            "end_time": self._format_indiamart_datetime(end_dt),
-        }
+        params: dict = {"glusr_crm_key": api_key}
+        if start_dt:
+            params["start_time"] = self._format_indiamart_datetime(
+                start_dt, date_only=bool(day_wise)
+            )
+        if end_dt:
+            params["end_time"] = self._format_indiamart_datetime(
+                end_dt, date_only=bool(day_wise)
+            )
 
         request_payload = self._to_json(params)
         try:
@@ -628,24 +635,63 @@ class IndiamartIntegrationSettings(Document):
         return endpoint
 
     def _get_time_window(
-        self, start_time: str | None, end_time: str | None
-    ) -> tuple[datetime, datetime]:
-        end_dt = get_datetime(end_time) if end_time else now_datetime()
-        if start_time:
-            start_dt = get_datetime(start_time)
+        self, start_time: str | None, end_time: str | None, day_wise: int = 0
+    ) -> tuple[datetime | None, datetime | None]:
+        if day_wise:
+            # Day-wise mode: use explicit dates or default to today (midnight-to-midnight)
+            if start_time:
+                start_dt = get_datetime(start_time).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+            else:
+                start_dt = now_datetime().replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+
+            if end_time:
+                end_dt = get_datetime(end_time).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+            else:
+                end_dt = start_dt  # same day — IndiaMart returns full-day data
+
+            if start_dt > end_dt:
+                frappe.throw(_("Start Time cannot be greater than End Time"))
+            return start_dt, end_dt
+
         else:
-            minutes = max(cint(self.sync_time or 5), 5)
-            start_dt = add_to_date(end_dt, minutes=-minutes, as_datetime=True)
+            # Minute-wise mode
+            if start_time or end_time:
+                # Explicit window provided — use it
+                end_dt = get_datetime(end_time) if end_time else now_datetime()
+                start_dt = (
+                    get_datetime(start_time)
+                    if start_time
+                    else add_to_date(
+                        end_dt,
+                        minutes=-max(cint(self.sync_time or 5), 5),
+                        as_datetime=True,
+                    )
+                )
+                if start_dt > end_dt:
+                    frappe.throw(_("Start Time cannot be greater than End Time"))
+                return start_dt, end_dt
+            else:
+                # No explicit window — omit both so IndiaMart returns last 24 hours
+                return None, None
 
-        if start_dt > end_dt:
-            frappe.throw(_("Start Time cannot be greater than End Time"))
-
-        return start_dt, end_dt
-
-    def _format_indiamart_datetime(self, value: datetime) -> str:
+    def _format_indiamart_datetime(
+        self, value: datetime, date_only: bool = False
+    ) -> str:
+        if date_only:
+            return value.strftime("%d-%b-%Y")
         return value.strftime("%d-%b-%Y%H:%M:%S")
 
     def _is_sync_due(self) -> tuple[bool, str]:
+        # Day-wise mode has no rate-limit — each run fetches a full day
+        if cint(self.get("day_wise")):
+            return True, ""
+
         last_sync_on = self.get("last_sync_on")
         if not last_sync_on:
             return True, ""

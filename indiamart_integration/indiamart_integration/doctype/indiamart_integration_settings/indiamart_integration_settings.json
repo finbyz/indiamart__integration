@@ -8,6 +8,7 @@
   "indiamart_integration_section",
   "testing",
   "api_key",
+  "day_wise",
   "column_break_eiro",
   "api_secret",
   "api_end_point",
@@ -64,13 +65,19 @@
    "fieldname": "testing",
    "fieldtype": "Check",
    "label": "Testing"
+  },
+  {
+   "default": "0",
+   "fieldname": "day_wise",
+   "fieldtype": "Check",
+   "label": "Day Wise"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-07 12:22:13.036389",
+ "modified": "2026-03-07 13:55:34.346726",
  "modified_by": "Administrator",
  "module": "Indiamart Integration",
  "name": "Indiamart Integration Settings",
