@@ -481,6 +481,18 @@ class IndiamartIntegrationSettings(Document):
         create_records: int = 1,
         trigger_source: str = "Manual",
     ):
+        if not cint(self.get("enable")):
+            return {
+                "processed_rows": 0,
+                "created_customer": 0,
+                "created_address": 0,
+                "created_lead": 0,
+                "status": "Skipped",
+                "message": _(
+                    "IndiaMart Integration is disabled. Enable it in Indiamart Integration Settings."
+                ),
+            }
+
         create_records = int(create_records or 0)
         trigger_source = (trigger_source or "Manual").strip().title()
         fetch_request_type = f"Fetch CRM Leads ({trigger_source})"
@@ -991,6 +1003,8 @@ def sync_indiamart_leads(
 
 def scheduled_sync_indiamart_leads():
     settings = frappe.get_single("Indiamart Integration Settings")
+    if not cint(settings.get("enable")):
+        return
     try:
         settings.sync_indiamart_leads(create_records=1, trigger_source="Scheduler")
     except Exception:

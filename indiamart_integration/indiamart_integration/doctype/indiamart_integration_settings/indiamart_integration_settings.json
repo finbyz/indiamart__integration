@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "indiamart_integration_section",
+  "enable",
   "testing",
   "api_key",
   "day_wise",
@@ -71,13 +72,19 @@
    "fieldname": "day_wise",
    "fieldtype": "Check",
    "label": "Day Wise"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable",
+   "fieldtype": "Check",
+   "label": "Enable"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-07 13:55:34.346726",
+ "modified": "2026-03-10 17:59:08.773439",
  "modified_by": "Administrator",
  "module": "Indiamart Integration",
  "name": "Indiamart Integration Settings",
