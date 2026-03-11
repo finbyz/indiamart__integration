@@ -1028,11 +1028,13 @@ class IndiamartIntegrationSettings(Document):
     def _ensure_address_links(self, address_name: str, customer: str):
         address = frappe.get_doc("Address", address_name)
         existing_links = {(d.link_doctype, d.link_name) for d in address.links}
+        has_new_link = False
 
         if ("Customer", customer) not in existing_links:
             address.append("links", {"link_doctype": "Customer", "link_name": customer})
+            has_new_link = True
 
-        if address.is_dirty():
+        if has_new_link:
             address.save(ignore_permissions=True)
 
     def _get_company(self) -> str:
