@@ -451,6 +451,7 @@
 # For license information, please see license.txt
 
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -480,6 +481,7 @@ class IndiamartIntegrationSettings(Document):
         end_time: str | None = None,
         create_records: int = 1,
         trigger_source: str = "Manual",
+        use_date_only: int | None = None,
     ):
         if not cint(self.get("enable")):
             return {
@@ -498,7 +500,12 @@ class IndiamartIntegrationSettings(Document):
         fetch_request_type = f"Fetch CRM Leads ({trigger_source})"
         process_request_type = f"Process CRM Lead ({trigger_source})"
 
-        is_due, due_message = self._is_sync_due()
+        if use_date_only in (None, ""):
+            day_wise = cint(self.get("day_wise"))
+        else:
+            day_wise = cint(use_date_only)
+
+        is_due, due_message = self._is_sync_due(day_wise=day_wise)
         if not is_due:
             self._append_log(
                 request_type=fetch_request_type,
@@ -519,7 +526,6 @@ class IndiamartIntegrationSettings(Document):
 
         endpoint = self._get_endpoint()
         api_key = self._get_api_key()
-        day_wise = cint(self.get("day_wise"))
         start_dt, end_dt = self._get_time_window(
             start_time, end_time, day_wise=day_wise
         )
@@ -534,7 +540,7 @@ class IndiamartIntegrationSettings(Document):
                 end_dt, date_only=bool(day_wise)
             )
 
-        request_payload = self._to_json(params)
+        request_payload = self._to_json(self._redact_sensitive_params(params))
         try:
             response = make_get_request(endpoint, params=params)
             is_success, api_message = self._validate_api_response(response)
@@ -649,6 +655,8 @@ class IndiamartIntegrationSettings(Document):
     def _get_time_window(
         self, start_time: str | None, end_time: str | None, day_wise: int = 0
     ) -> tuple[datetime | None, datetime | None]:
+        max_seconds = 7 * 24 * 60 * 60
+
         if day_wise:
             # Day-wise mode: use explicit dates or default to today (midnight-to-midnight)
             if start_time:
@@ -669,6 +677,10 @@ class IndiamartIntegrationSettings(Document):
 
             if start_dt > end_dt:
                 frappe.throw(_("Start Time cannot be greater than End Time"))
+            if (end_dt - start_dt).total_seconds() > max_seconds:
+                frappe.throw(
+                    _("Maximum allowed difference between Start Time and End Time is 7 days")
+                )
             return start_dt, end_dt
 
         else:
@@ -687,6 +699,10 @@ class IndiamartIntegrationSettings(Document):
                 )
                 if start_dt > end_dt:
                     frappe.throw(_("Start Time cannot be greater than End Time"))
+                if (end_dt - start_dt).total_seconds() > max_seconds:
+                    frappe.throw(
+                        _("Maximum allowed difference between Start Time and End Time is 7 days")
+                    )
                 return start_dt, end_dt
             else:
                 # No explicit window — omit both so IndiaMart returns last 24 hours
@@ -699,9 +715,9 @@ class IndiamartIntegrationSettings(Document):
             return value.strftime("%d-%b-%Y")
         return value.strftime("%d-%b-%Y%H:%M:%S")
 
-    def _is_sync_due(self) -> tuple[bool, str]:
+    def _is_sync_due(self, day_wise: int = 0) -> tuple[bool, str]:
         # Day-wise mode has no rate-limit — each run fetches a full day
-        if cint(self.get("day_wise")):
+        if cint(day_wise):
             return True, ""
 
         last_sync_on = self.get("last_sync_on")
@@ -732,7 +748,17 @@ class IndiamartIntegrationSettings(Document):
                 value = response.get(key)
                 if isinstance(value, list):
                     return [row for row in value if isinstance(row, dict)]
-            return [response]
+            if any(
+                key in response
+                for key in (
+                    "UNIQUE_QUERY_ID",
+                    "SENDER_EMAIL",
+                    "SENDER_MOBILE",
+                    "QUERY_MESSAGE",
+                )
+            ):
+                return [response]
+            return []
 
         return []
 
@@ -856,9 +882,13 @@ class IndiamartIntegrationSettings(Document):
         self, row: dict, customer: str | None = None
     ) -> tuple[str, bool]:
         company = self._get_company()
-        email = self._get_value(row, "SENDER_EMAIL", "EMAIL", "EMAIL_ID")
-        mobile = self._get_value(row, "SENDER_MOBILE", "MOBILE", "MOBILE_NO", "PHONE")
-        unique_query_id = self._get_value(row, "UNIQUE_QUERY_ID")
+        email_raw = self._get_value(row, "SENDER_EMAIL", "EMAIL", "EMAIL_ID")
+        mobile_raw = self._get_value(
+            row, "SENDER_MOBILE", "MOBILE", "MOBILE_NO", "PHONE"
+        )
+        unique_query_id = self._normalize_text(self._get_value(row, "UNIQUE_QUERY_ID"))
+        email = self._normalize_email(email_raw)
+        mobile = self._normalize_phone(mobile_raw)
 
         # Deduplicate by UNIQUE_QUERY_ID first — each enquiry is a distinct lead
         if unique_query_id:
@@ -868,12 +898,28 @@ class IndiamartIntegrationSettings(Document):
             if existing:
                 return existing, False
 
-        # Fall back to email / mobile dedup for backwards compatibility
+        # Fall back to contact + enquiry dedup when query id is absent.
         existing = None
         if email:
             existing = frappe.db.get_value("Lead", {"email_id": email}, "name")
         if not existing and mobile:
             existing = frappe.db.get_value("Lead", {"mobile_no": mobile}, "name")
+        if not existing and mobile:
+            existing = frappe.db.get_value("Lead", {"phone": mobile}, "name")
+        if not existing:
+            enquiry_message = self._normalize_text(self._get_value(row, "QUERY_MESSAGE"))
+            if enquiry_message and email:
+                existing = frappe.db.get_value(
+                    "Lead",
+                    {"email_id": email, "enquiry_message": enquiry_message},
+                    "name",
+                )
+            if not existing and enquiry_message and mobile:
+                existing = frappe.db.get_value(
+                    "Lead",
+                    {"mobile_no": mobile, "enquiry_message": enquiry_message},
+                    "name",
+                )
         if existing:
             return existing, False
 
@@ -887,8 +933,8 @@ class IndiamartIntegrationSettings(Document):
             )
 
         lead.company_name = lead.company_name or customer
-        lead.email_id = email
-        lead.mobile_no = mobile
+        lead.email_id = email or email_raw
+        lead.mobile_no = mobile or mobile_raw
         lead.phone = self._get_value(row, "PHONE", "SENDER_PHONE")
         lead.city = self._get_value(row, "SENDER_CITY", "CITY")
         lead.state = self._get_value(row, "SENDER_STATE", "STATE")
@@ -901,7 +947,9 @@ class IndiamartIntegrationSettings(Document):
         lead.query_type = self._get_value(row, "QUERY_TYPE")
         lead.product_name = self._get_value(row, "QUERY_PRODUCT_NAME")
         lead.category = self._get_value(row, "QUERY_MCAT_NAME")
-        lead.alternate_mobile = self._get_value(row, "SENDER_MOBILE_ALT")
+        lead.alternate_mobile = self._normalize_phone(
+            self._get_value(row, "SENDER_MOBILE_ALT")
+        ) or self._get_value(row, "SENDER_MOBILE_ALT")
         lead.enquiry_message = self._get_value(row, "QUERY_MESSAGE")
 
         lead.insert(ignore_permissions=True)
@@ -928,6 +976,24 @@ class IndiamartIntegrationSettings(Document):
 
     def _to_json(self, payload: Any) -> str:
         return json.dumps(payload, default=str)
+
+    def _redact_sensitive_params(self, payload: dict[str, Any]) -> dict[str, Any]:
+        redacted = dict(payload or {})
+        if redacted.get("glusr_crm_key"):
+            redacted["glusr_crm_key"] = "***REDACTED***"
+        return redacted
+
+    def _normalize_text(self, value: str) -> str:
+        return (value or "").strip()
+
+    def _normalize_email(self, value: str) -> str:
+        return (value or "").strip().lower()
+
+    def _normalize_phone(self, value: str) -> str:
+        digits = re.sub(r"\D+", "", value or "")
+        if len(digits) > 10 and digits.startswith("91"):
+            digits = digits[-10:]
+        return digits
 
     def _get_customer_defaults(self) -> tuple[str, str]:
         customer_group = frappe.db.get_single_value(
@@ -991,6 +1057,7 @@ def sync_indiamart_leads(
     end_time: str | None = None,
     create_records: int = 1,
     trigger_source: str = "Manual",
+    use_date_only: int | None = None,
 ):
     settings = frappe.get_single("Indiamart Integration Settings")
     return settings.sync_indiamart_leads(
@@ -998,6 +1065,7 @@ def sync_indiamart_leads(
         end_time=end_time,
         create_records=create_records,
         trigger_source=trigger_source,
+        use_date_only=use_date_only,
     )
 
 
@@ -1006,7 +1074,11 @@ def scheduled_sync_indiamart_leads():
     if not cint(settings.get("enable")):
         return
     try:
-        settings.sync_indiamart_leads(create_records=1, trigger_source="Scheduler")
+        settings.sync_indiamart_leads(
+            create_records=1,
+            trigger_source="Scheduler",
+            use_date_only=0,
+        )
     except Exception:
         settings._append_log(
             request_type="Fetch CRM Leads (Scheduler)",

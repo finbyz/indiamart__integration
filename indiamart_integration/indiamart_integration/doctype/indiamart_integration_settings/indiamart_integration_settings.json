@@ -38,10 +38,10 @@
    "label": "Api Secret"
   },
   {
+   "default": "5",
    "fieldname": "sync_time",
    "fieldtype": "Int",
-   "label": "Sync Time",
-   "read_only": 1
+   "label": "Sync Time (Minutes)"
   },
   {
    "fieldname": "api_logs_tab",
@@ -56,21 +56,24 @@
    "options": "Indiamart API Log"
   },
   {
+   "default": "https://mapi.indiamart.com/wservce/crm/crmListing/v2/",
    "fieldname": "api_end_point",
    "fieldtype": "Data",
    "label": "Api End Point",
    "options": "URL"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "testing",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Testing"
   },
   {
    "default": "0",
    "fieldname": "day_wise",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Day Wise"
   },
   {
@@ -84,7 +87,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-10 17:59:08.773439",
+ "modified": "2026-03-11 17:12:09.847327",
  "modified_by": "Administrator",
  "module": "Indiamart Integration",
  "name": "Indiamart Integration Settings",
