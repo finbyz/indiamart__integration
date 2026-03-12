@@ -829,7 +829,7 @@ class IndiamartIntegrationSettings(Document):
         customer = frappe.new_doc("Customer")
         customer.customer_name = customer_name
         customer.customer_type = "Company"
-        customer.customer_group = customer_group
+        customer.customer_group = "Default"
         customer.territory = territory
         customer.email_id = self._get_value(row, "SENDER_EMAIL", "EMAIL", "EMAIL_ID")
         customer.mobile_no = self._get_value(
