@@ -230,7 +230,9 @@ class IndiamartIntegrationSettings(Document):
                 frappe.throw(_("Start Time cannot be greater than End Time"))
             if (end_dt - start_dt).total_seconds() > max_seconds:
                 frappe.throw(
-                    _("Maximum allowed difference between Start Time and End Time is 7 days")
+                    _(
+                        "Maximum allowed difference between Start Time and End Time is 7 days"
+                    )
                 )
             return start_dt, end_dt
 
@@ -252,7 +254,9 @@ class IndiamartIntegrationSettings(Document):
                     frappe.throw(_("Start Time cannot be greater than End Time"))
                 if (end_dt - start_dt).total_seconds() > max_seconds:
                     frappe.throw(
-                        _("Maximum allowed difference between Start Time and End Time is 7 days")
+                        _(
+                            "Maximum allowed difference between Start Time and End Time is 7 days"
+                        )
                     )
                 return start_dt, end_dt
             else:
@@ -458,7 +462,9 @@ class IndiamartIntegrationSettings(Document):
         if not existing and mobile:
             existing = frappe.db.get_value("Lead", {"phone": mobile}, "name")
         if not existing:
-            enquiry_message = self._normalize_text(self._get_value(row, "QUERY_MESSAGE"))
+            enquiry_message = self._normalize_text(
+                self._get_value(row, "QUERY_MESSAGE")
+            )
             if enquiry_message and email:
                 existing = frappe.db.get_value(
                     "Lead",
@@ -493,7 +499,8 @@ class IndiamartIntegrationSettings(Document):
         lead.company = company
         lead.request_type = "Product Enquiry"
         lead.source = "Indiamart"
-
+        query_time = self._get_value(row, "QUERY_TIME")
+        lead.creation_on = get_datetime(query_time) if query_time else now_datetime()
         # IndiaMart-specific custom fields
         lead.indiamart_query_id = unique_query_id
         lead.query_type = self._get_value(row, "QUERY_TYPE")
