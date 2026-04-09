@@ -498,7 +498,7 @@ class IndiamartIntegrationSettings(Document):
         lead.country = self._get_value(row, "SENDER_COUNTRY", "COUNTRY") or "India"
         lead.company = company
         lead.request_type = "Product Enquiry"
-        lead.source = "Indiamart"
+        lead.utm_source = "Indiamart"
         query_time = self._get_value(row, "QUERY_TIME")
         lead.creation_on = get_datetime(query_time) if query_time else now_datetime()
         # IndiaMart-specific custom fields
