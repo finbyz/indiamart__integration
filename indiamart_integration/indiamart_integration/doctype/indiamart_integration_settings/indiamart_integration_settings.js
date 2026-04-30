@@ -12,6 +12,7 @@ frappe.ui.form.on("Indiamart Integration Settings", {
 						start_time: null,
 						end_time: null,
 						use_date_only: 0,
+						create_records: 1,
 						trigger_source: "Manual",
 					});
 				},
@@ -80,6 +81,7 @@ function open_fetch_range_dialog(frm) {
 				start_time: values.fetch_mode === "Between Dates" ? values.start_date : null,
 				end_time: values.fetch_mode === "Between Dates" ? values.end_date : null,
 				use_date_only: values.fetch_mode === "Between Dates" ? 1 : 0,
+				create_records: 1,
 				trigger_source: "Manual Dialog",
 			});
 			dialog.hide();

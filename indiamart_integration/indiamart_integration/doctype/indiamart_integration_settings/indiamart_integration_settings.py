@@ -46,7 +46,7 @@ class IndiamartIntegrationSettings(Document):
                 ),
             }
 
-        create_records = int(create_records or 0)
+        create_records = int(create_records if create_records is not None else 1)
         trigger_source = (trigger_source or "Manual").strip().title()
         fetch_request_type = f"Fetch CRM Leads ({trigger_source})"
         process_request_type = f"Process CRM Lead ({trigger_source})"
@@ -149,20 +149,30 @@ class IndiamartIntegrationSettings(Document):
 
             try:
                 if create_records:
-                    customer_name, is_new_customer = self._get_or_create_customer(row)
-                    address_name, is_new_address = self._get_or_create_address(
-                        row, customer_name
-                    )
+                    # Check if customer and address creation is enabled
+                    should_create_customer = cint(self.get("create_customer_and_address"))
+                    
+                    customer_name = None
+                    address_name = None
+                    
+                    if should_create_customer:
+                        customer_name, is_new_customer = self._get_or_create_customer(row)
+                        address_name, is_new_address = self._get_or_create_address(
+                            row, customer_name
+                        )
+                        created_customer += int(is_new_customer)
+                        created_address += int(is_new_address)
+                    
+                    # Always create lead
                     lead_name, is_new_lead = self._get_or_create_lead(
                         row, customer_name
                     )
+                    
                     result = {
                         "customer": customer_name,
                         "address": address_name,
                         "lead": lead_name,
                     }
-                    created_customer += int(is_new_customer)
-                    created_address += int(is_new_address)
                     created_lead += int(is_new_lead)
             except Exception:
                 status = "Failed"
@@ -485,11 +495,20 @@ class IndiamartIntegrationSettings(Document):
         if full_name:
             lead.first_name = full_name
         else:
+            # If customer is not created, use company name from IndiaMart data
             lead.company_name = customer or self._get_value(
-                row, "SENDER_COMPANY", "COMPANY"
+                row, "SENDER_COMPANY", "COMPANY", "COMPANY_NAME", "COMPANYNAME"
             )
 
-        lead.company_name = lead.company_name or customer
+        # Set company_name field (can be customer name or company from IndiaMart)
+        if customer:
+            lead.company_name = customer
+        elif not full_name:
+            # If no customer and no full name, use company from IndiaMart
+            lead.company_name = self._get_value(
+                row, "SENDER_COMPANY", "COMPANY", "COMPANY_NAME", "COMPANYNAME"
+            )
+
         lead.email_id = email or email_raw
         lead.mobile_no = mobile or mobile_raw
         lead.phone = self._get_value(row, "PHONE", "SENDER_PHONE")

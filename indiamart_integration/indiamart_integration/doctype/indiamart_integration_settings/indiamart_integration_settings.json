@@ -14,6 +14,8 @@
   "api_secret",
   "api_end_point",
   "sync_time",
+  "section_break_customer",
+  "create_customer_and_address",
   "api_logs_tab",
   "logs"
  ],
@@ -81,6 +83,18 @@
    "fieldname": "enable",
    "fieldtype": "Check",
    "label": "Enable"
+  },
+  {
+   "fieldname": "section_break_customer",
+   "fieldtype": "Section Break",
+   "label": "Customer Creation Settings"
+  },
+  {
+   "default": "0",
+   "description": "If checked, Customer and Address will be created automatically along with Lead. If unchecked, only Lead will be created.",
+   "fieldname": "create_customer_and_address",
+   "fieldtype": "Check",
+   "label": "Create Customer and Address"
   }
  ],
  "grid_page_length": 50,
