@@ -149,7 +149,7 @@ fixtures = [
 
 scheduler_events = {
     "cron": {
-        "*/5 * * * *": [
+        "*/7 * * * *": [
             "indiamart_integration.indiamart_integration.doc_events.cron_job.scheduled_sync_indiamart_leads"
         ]
     }
