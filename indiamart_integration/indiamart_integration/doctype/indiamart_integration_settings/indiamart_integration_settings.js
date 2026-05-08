@@ -82,7 +82,7 @@ function open_fetch_range_dialog(frm) {
 				end_time: values.fetch_mode === "Between Dates" ? values.end_date : null,
 				use_date_only: values.fetch_mode === "Between Dates" ? 1 : 0,
 				create_records: 1,
-				trigger_source: "Manual Dialog",
+				trigger_source: "Manual",
 			});
 			dialog.hide();
 		},
@@ -92,24 +92,40 @@ function open_fetch_range_dialog(frm) {
 }
 
 async function run_indiamart_sync(frm, payload) {
-	const response = await frm.call("sync_indiamart_leads", payload);
-	const result = response.message || {};
-	const api_message = result.message
-		? `<br><br>${frappe.utils.escape_html(result.message)}`
-		: "";
+	if (frm.indiamart_sync_in_progress) {
+		frappe.show_alert({
+			message: __("IndiaMART sync is already running. Please wait."),
+			indicator: "orange",
+		});
+		return;
+	}
 
-	frappe.msgprint(
-		__(
-			"Processed: {0}<br>Created Customers: {1}<br>Created Addresses: {2}<br>Created Leads: {3}{4}",
-			[
-				result.processed_rows || 0,
-				result.created_customer || 0,
-				result.created_address || 0,
-				result.created_lead || 0,
-				api_message,
-			]
-		)
-	);
+	frm.indiamart_sync_in_progress = true;
+	frappe.dom.freeze(__("Fetching IndiaMART leads. Please wait..."));
 
-	frm.reload_doc();
+	try {
+		const response = await frm.call("sync_indiamart_leads", payload);
+		const result = response.message || {};
+		const api_message = result.message
+			? `<br><br>${frappe.utils.escape_html(result.message)}`
+			: "";
+
+		frappe.msgprint(
+			__(
+				"Processed: {0}<br>Created Customers: {1}<br>Created Addresses: {2}<br>Created Leads: {3}{4}",
+				[
+					result.processed_rows || 0,
+					result.created_customer || 0,
+					result.created_address || 0,
+					result.created_lead || 0,
+					api_message,
+				]
+			)
+		);
+
+		frm.reload_doc();
+	} finally {
+		frappe.dom.unfreeze();
+		frm.indiamart_sync_in_progress = false;
+	}
 }

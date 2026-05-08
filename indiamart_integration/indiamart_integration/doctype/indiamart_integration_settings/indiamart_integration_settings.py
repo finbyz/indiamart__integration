@@ -47,7 +47,7 @@ class IndiamartIntegrationSettings(Document):
             }
 
         create_records = int(create_records if create_records is not None else 1)
-        trigger_source = (trigger_source or "Manual").strip().title()
+        trigger_source = self._normalize_trigger_source(trigger_source)
         fetch_request_type = f"Fetch CRM Leads ({trigger_source})"
         process_request_type = f"Process CRM Lead ({trigger_source})"
 
@@ -134,6 +134,9 @@ class IndiamartIntegrationSettings(Document):
             response_payload=self._to_json(response),
             status="Success",
         )
+        self.save(ignore_permissions=True)
+        self.db_set("last_sync_on", now_datetime(), update_modified=False)
+        frappe.db.commit()
 
         created_customer = 0
         created_address = 0
@@ -310,19 +313,30 @@ class IndiamartIntegrationSettings(Document):
         if date_only:
             return value.strftime("%d-%b-%Y")
         return value.strftime("%d-%m-%Y%H:%M:%S")
-    
-    def _is_sync_due(self, day_wise: int = 0) -> tuple[bool, str]:
-        # Day-wise mode has no rate-limit — each run fetches a full day
-        if cint(day_wise):
-            return True, ""
 
-        last_sync_on = self.get("last_sync_on")
-        if not last_sync_on:
+    def _normalize_trigger_source(self, trigger_source: str | None = None) -> str:
+        trigger_source = (trigger_source or "Manual").strip().lower()
+        if trigger_source in ("auto", "scheduler", "scheduled", "cron"):
+            return "Auto"
+        return "Manual"
+
+    def _is_sync_due(self, day_wise: int = 0) -> tuple[bool, str]:
+        last_fetch_attempt_on = self._get_last_fetch_attempt_on()
+        last_sync_on = (
+            get_datetime(self.get("last_sync_on"))
+            if self.get("last_sync_on")
+            else None
+        )
+        last_hit_on = max(
+            [dt for dt in (last_fetch_attempt_on, last_sync_on) if dt],
+            default=None,
+        )
+        if not last_hit_on:
             return True, ""
 
         interval_minutes = max(cint(self.sync_time or 5), 5)
         elapsed_seconds = time_diff_in_seconds(
-            now_datetime(), get_datetime(last_sync_on)
+            now_datetime(), last_hit_on
         )
         remaining_seconds = (
             interval_minutes * 60 + RATE_LIMIT_BUFFER_SECONDS
@@ -334,6 +348,26 @@ class IndiamartIntegrationSettings(Document):
             )
 
         return True, ""
+
+    def _get_last_fetch_attempt_on(self) -> datetime | None:
+        last_fetch_attempt = frappe.db.sql(
+            """
+            SELECT time
+            FROM `tabIndiamart API Log`
+            WHERE
+                parent = %s
+                AND request_type LIKE 'Fetch CRM Leads%%'
+                AND status != 'Skipped'
+                AND time IS NOT NULL
+            ORDER BY time DESC
+            LIMIT 1
+            """,
+            (self.name,),
+            as_dict=1,
+        )
+        if not last_fetch_attempt:
+            return None
+        return get_datetime(last_fetch_attempt[0].time)
 
     def _extract_response_rows(self, response: Any) -> list[dict]:
         if isinstance(response, list):
@@ -687,12 +721,12 @@ def scheduled_sync_indiamart_leads():
     try:
         settings.sync_indiamart_leads(
             create_records=1,
-            trigger_source="Scheduler",
+            trigger_source="Auto",
             use_date_only=0,
         )
     except Exception:
         settings._append_log(
-            request_type="Fetch CRM Leads (Scheduler)",
+            request_type="Fetch CRM Leads (Auto)",
             endpoint=(settings.get("api_end_point") or "").strip(),
             status="Failed",
             error_message=frappe.get_traceback(),
