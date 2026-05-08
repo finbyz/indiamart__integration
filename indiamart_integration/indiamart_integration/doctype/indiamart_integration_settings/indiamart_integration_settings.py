@@ -105,7 +105,6 @@ class IndiamartIntegrationSettings(Document):
                     error_message=api_message,
                 )
                 self.save(ignore_permissions=True)
-                self.db_set("last_sync_on", now_datetime(), update_modified=False)
                 frappe.db.commit()
                 return {
                     "processed_rows": 0,
@@ -270,15 +269,47 @@ class IndiamartIntegrationSettings(Document):
                     )
                 return start_dt, end_dt
             else:
-                # No explicit window — omit both so IndiaMart returns last 24 hours
-                return None, None
+                # Automatic rolling sync window
+
+                current_time = now_datetime()
+
+                last_success = frappe.db.sql("""
+                    SELECT time
+                    FROM `tabIndiamart API Log`
+                    WHERE
+                        parent = %s
+                        AND request_type LIKE 'Fetch CRM Leads%%'
+                        AND status = 'Success'
+                    ORDER BY time DESC
+                    LIMIT 1
+                """, (self.name,), as_dict=1)
+
+                if last_success:
+                    previous_end = get_datetime(last_success[0].time)
+
+                    # IndiaMART Strategy-2 overlap protection
+                    start_dt = add_to_date(
+                        previous_end,
+                        minutes=-5,
+                        as_datetime=True,
+                    )
+                else:
+                    start_dt = add_to_date(
+                        current_time,
+                        minutes=-max(cint(self.sync_time or 5), 5),
+                        as_datetime=True,
+                    )
+
+                end_dt = current_time
+
+                return start_dt, end_dt
 
     def _format_indiamart_datetime(
         self, value: datetime, date_only: bool = False
     ) -> str:
         if date_only:
             return value.strftime("%d-%b-%Y")
-        return value.strftime("%d-%b-%Y%H:%M:%S")
+        return value.strftime("%d-%b-%Y %H:%M:%S")
 
     def _is_sync_due(self, day_wise: int = 0) -> tuple[bool, str]:
         # Day-wise mode has no rate-limit — each run fetches a full day
