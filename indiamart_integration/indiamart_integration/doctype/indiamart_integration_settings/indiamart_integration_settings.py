@@ -309,8 +309,8 @@ class IndiamartIntegrationSettings(Document):
     ) -> str:
         if date_only:
             return value.strftime("%d-%b-%Y")
-        return value.strftime("%d-%m-%Y %H:%M:%S")
-
+        return value.strftime("%d-%m-%Y%H:%M:%S")
+    
     def _is_sync_due(self, day_wise: int = 0) -> tuple[bool, str]:
         # Day-wise mode has no rate-limit — each run fetches a full day
         if cint(day_wise):
