@@ -153,10 +153,10 @@ class IndiamartIntegrationSettings(Document):
                 if create_records:
                     # Check if customer and address creation is enabled
                     should_create_customer = cint(self.get("create_customer_and_address"))
-                    
+
                     customer_name = None
                     address_name = None
-                    
+
                     if should_create_customer:
                         customer_name, is_new_customer = self._get_or_create_customer(row)
                         address_name, is_new_address = self._get_or_create_address(
@@ -164,12 +164,20 @@ class IndiamartIntegrationSettings(Document):
                         )
                         created_customer += int(is_new_customer)
                         created_address += int(is_new_address)
-                    
+
                     # Always create lead
                     lead_name, is_new_lead = self._get_or_create_lead(
                         row, customer_name
                     )
-                    
+
+                    # Link the same address record to the Lead as well.
+                    # Previously the address was only ever linked to the
+                    # Customer, so the Lead <-> Address relationship never
+                    # showed up anywhere (e.g. Address "Linked With" / lookups
+                    # against the Lead).
+                    if address_name:
+                        self._ensure_address_links(address_name, "Lead", lead_name)
+
                     result = {
                         "customer": customer_name,
                         "address": address_name,
@@ -488,7 +496,7 @@ class IndiamartIntegrationSettings(Document):
             "name",
         )
         if existing:
-            self._ensure_address_links(existing, customer)
+            self._ensure_address_links(existing, "Customer", customer)
             return existing, False
 
         address = frappe.new_doc("Address")
@@ -668,16 +676,18 @@ class IndiamartIntegrationSettings(Document):
 
         return "India"
 
-    def _ensure_address_links(self, address_name: str, customer: str):
+    def _ensure_address_links(self, address_name: str, link_doctype: str, link_name: str):
+        """Make sure `address_name` has a Dynamic Link row pointing at
+        (link_doctype, link_name), e.g. ("Customer", "Acme Corp") or
+        ("Lead", "CRM-LEAD-0001"). No-op if the link already exists.
+        """
         address = frappe.get_doc("Address", address_name)
         existing_links = {(d.link_doctype, d.link_name) for d in address.links}
-        has_new_link = False
 
-        if ("Customer", customer) not in existing_links:
-            address.append("links", {"link_doctype": "Customer", "link_name": customer})
-            has_new_link = True
-
-        if has_new_link:
+        if (link_doctype, link_name) not in existing_links:
+            address.append(
+                "links", {"link_doctype": link_doctype, "link_name": link_name}
+            )
             address.save(ignore_permissions=True)
 
     def _get_company(self) -> str:
